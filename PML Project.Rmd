@@ -1,0 +1,114 @@
+---
+title: "Practical Machine Learning Project"
+author: "jagodag"
+date: "Sunday, October 25, 2015"
+output: html_document
+---
+
+
+### Executive Summary
+
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+
+
+### Step by Step Explanation of the work
+
+First of all, I'm going to load all needed libraries.
+
+```{r}
+library(ElemStatLearn)
+library(caret)
+library(rpart)
+library(randomForest)
+```
+The next step will be getting trainset and test set, and preparing data for prediction ( removing NA's and getting rid of unknown columns). Then we will split training data into training and testing set ( 60 vs 40). Then we are going to validate our sets.
+
+```{r}
+trainset <- read.csv("pml-training.csv", header=TRUE, sep=",", na.strings=c("NA",""))
+testset <- read.csv("pml-testing.csv", header=TRUE, sep=",", na.strings=c("NA",""))
+```
+```{r}
+trainset <- trainset[,-1] 
+inTrain = createDataPartition(trainset$classe, p=0.60, list=FALSE)
+training = trainset[inTrain,]
+validating = trainset[-inTrain,]
+```
+
+```{r}
+sum((colSums(!is.na(training[,-ncol(training)])) < 0.6*nrow(training)))
+SCols <- c((colSums(!is.na(training[,-ncol(training)])) >= 0.6*nrow(training)))
+training   <-  training[,SCols]
+validating <- validating[,SCols]
+```
+ I will be using Random Forest Model for predictive analysis on training data.
+
+```{r}
+m<- randomForest(classe~.,data=training)
+print(m)
+importance(m)
+confusionMatrix(predict(m,newdata=validating[,-ncol(validating)]),validating$classe)
+```
+
+Now let's check the accuracy of the model.
+
+```{r}
+acc<-c(as.numeric(predict(m,newdata=validating[,-ncol(validating)])==validating$classe))
+acc<-sum(acc)*100/nrow(validating)
+plot(m, log ="y", lwd = 2, main = "Random Forest Accuracy Test")
+```
+
+Now we are going apply the test to the testing set to see how it beahves.
+
+```{r}
+testset <- testset[,-1] 
+testset <- testset[ ,SCols] 
+testset <- testset[,-ncol(testset)] 
+testing <- rbind(training[100, -59] , testset) 
+row.names(testing) <- c(100, 1:20)
+```
+Let's check what the Out of sample erros estimation.
+
+```{r}
+pred <- predict(m,newdata=testing[-1,])
+print(pred)
+```
+
+
+```{r}
+# true accuracy of the predicted model
+p2 <- predict(m, validating)
+outOfSampleError.accuracy <- sum(p2 == validating$classe)/length(p2)
+outOfSampleError.accuracy
+
+outOfSampleError <- 1 - outOfSampleError.accuracy
+outOfSampleError
+```
+
+```{r}
+e <- outOfSampleError * 100
+paste0("Out of sample error estimation: ", round(e, digits = 2), "%")
+```
+
+From the above, we can conclude that accuracy is quite good so the model does the job.
+
+### Submission to coursera 
+
+
+```{r}
+
+write_files <- function(x) {
+  n <- length(x)
+  for (i in 1:n) {
+    filename <- paste0("problem_id", i, ".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE,col.names=FALSE)
+  }
+}
+
+write_files(pred)
+
+```
